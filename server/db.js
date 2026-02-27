@@ -1,15 +1,13 @@
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
+const fs = require('fs');
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, 'budget.db');
 
-const db = new Database(DB_PATH);
+let _sqlDb = null;
+let _inTransaction = false;
 
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-db.exec(`
-  -- Users
+const SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
@@ -20,7 +18,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Financial accounts (bank, credit card, loan, investment, cash)
   CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -34,7 +31,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Transaction categories
   CREATE TABLE IF NOT EXISTS categories (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -47,7 +43,6 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Transactions
   CREATE TABLE IF NOT EXISTS transactions (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -65,7 +60,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Budgets
   CREATE TABLE IF NOT EXISTS budgets (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -78,7 +72,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Bills (recurring expenses)
   CREATE TABLE IF NOT EXISTS bills (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -95,7 +88,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Goals (savings goals)
   CREATE TABLE IF NOT EXISTS goals (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -110,7 +102,6 @@ db.exec(`
     updated_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Net worth snapshots (for tracking over time)
   CREATE TABLE IF NOT EXISTS net_worth_snapshots (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id),
@@ -118,11 +109,10 @@ db.exec(`
     total_assets REAL NOT NULL,
     total_liabilities REAL NOT NULL,
     net_worth REAL NOT NULL,
-    breakdown TEXT, -- JSON string of account balances
+    breakdown TEXT,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
-  -- Indexes
   CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date);
   CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions(category_id);
   CREATE INDEX IF NOT EXISTS idx_transactions_account ON transactions(account_id);
@@ -130,6 +120,88 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_bills_user ON bills(user_id);
   CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
   CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
-`);
+`;
+
+function saveSync() {
+  if (!_sqlDb) return;
+  const data = _sqlDb.export();
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
+
+// better-sqlite3-compatible wrapper around sql.js
+const db = {
+  async init() {
+    const SQL = await initSqlJs();
+    if (fs.existsSync(DB_PATH)) {
+      const buffer = fs.readFileSync(DB_PATH);
+      _sqlDb = new SQL.Database(buffer);
+    } else {
+      _sqlDb = new SQL.Database();
+    }
+    _sqlDb.run('PRAGMA foreign_keys = ON');
+    _sqlDb.exec(SCHEMA);
+    saveSync();
+    return db;
+  },
+
+  exec(sql) {
+    _sqlDb.exec(sql);
+    if (!_inTransaction) saveSync();
+  },
+
+  prepare(sql) {
+    return {
+      run(...params) {
+        _sqlDb.run(sql, params);
+        if (!_inTransaction) saveSync();
+        return { changes: _sqlDb.getRowsModified() };
+      },
+      get(...params) {
+        const stmt = _sqlDb.prepare(sql);
+        if (params.length) stmt.bind(params);
+        let result;
+        if (stmt.step()) {
+          result = stmt.getAsObject();
+        }
+        stmt.free();
+        return result;
+      },
+      all(...params) {
+        const results = [];
+        const stmt = _sqlDb.prepare(sql);
+        if (params.length) stmt.bind(params);
+        while (stmt.step()) {
+          results.push(stmt.getAsObject());
+        }
+        stmt.free();
+        return results;
+      },
+    };
+  },
+
+  transaction(fn) {
+    return (...args) => {
+      _sqlDb.run('BEGIN');
+      _inTransaction = true;
+      try {
+        const result = fn(...args);
+        _sqlDb.run('COMMIT');
+        _inTransaction = false;
+        saveSync();
+        return result;
+      } catch (e) {
+        _sqlDb.run('ROLLBACK');
+        _inTransaction = false;
+        throw e;
+      }
+    };
+  },
+
+  pragma() {
+    // handled in init()
+  },
+
+  saveSync,
+};
 
 module.exports = db;

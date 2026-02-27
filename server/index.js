@@ -1,16 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const authRoutes = require('./routes/auth');
-const accountRoutes = require('./routes/accounts');
-const transactionRoutes = require('./routes/transactions');
-const categoryRoutes = require('./routes/categories');
-const budgetRoutes = require('./routes/budgets');
-const billRoutes = require('./routes/bills');
-const goalRoutes = require('./routes/goals');
-const dashboardRoutes = require('./routes/dashboard');
-const netWorthRoutes = require('./routes/networth');
-const trendsRoutes = require('./routes/trends');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,17 +9,17 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/accounts', accountRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/bills', billRoutes);
-app.use('/api/goals', goalRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/networth', netWorthRoutes);
-app.use('/api/trends', trendsRoutes);
+// API routes (loaded synchronously - db calls only happen inside handlers)
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/accounts', require('./routes/accounts'));
+app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/categories', require('./routes/categories'));
+app.use('/api/budgets', require('./routes/budgets'));
+app.use('/api/bills', require('./routes/bills'));
+app.use('/api/goals', require('./routes/goals'));
+app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/networth', require('./routes/networth'));
+app.use('/api/trends', require('./routes/trends'));
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
@@ -38,6 +29,12 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Initialize database, then start server
+db.init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}).catch(err => {
+  console.error('Failed to initialize database:', err);
+  process.exit(1);
 });
