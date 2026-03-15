@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
+const { decryptTransaction, decryptAccount } = require('../utils/encryption');
 
 const router = express.Router();
 router.use(authenticate);
@@ -11,7 +12,8 @@ router.get('/', (req, res) => {
   const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
 
   // Account balances summary
-  const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? AND is_active = 1').all(req.userId);
+  const accounts = db.prepare('SELECT * FROM accounts WHERE user_id = ? AND is_active = 1').all(req.userId)
+    .map(a => decryptAccount(a, req.encryptionKey));
   const totalAssets = accounts.filter(a => !['credit_card', 'loan'].includes(a.type)).reduce((s, a) => s + a.balance, 0);
   const totalLiabilities = accounts.filter(a => ['credit_card', 'loan'].includes(a.type)).reduce((s, a) => s + Math.abs(a.balance), 0);
   const netWorth = totalAssets - totalLiabilities;
@@ -37,7 +39,7 @@ router.get('/', (req, res) => {
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.user_id = ?
     ORDER BY t.date DESC, t.created_at DESC LIMIT 10
-  `).all(req.userId);
+  `).all(req.userId).map(tx => decryptTransaction(tx, req.encryptionKey));
 
   // Budget overview
   const budgets = db.prepare(`

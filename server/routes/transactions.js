@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
+const { encryptTransaction, decryptTransaction } = require('../utils/encryption');
 
 const router = express.Router();
 router.use(authenticate);
@@ -29,7 +30,7 @@ router.get('/', (req, res) => {
   if (limit) { query += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { query += ' OFFSET ?'; params.push(parseInt(offset)); }
 
-  const transactions = db.prepare(query).all(...params);
+  const transactions = db.prepare(query).all(...params).map(tx => decryptTransaction(tx, req.encryptionKey));
 
   // Get total count for pagination
   let countQuery = `SELECT COUNT(*) as total FROM transactions t WHERE t.user_id = ?`;
@@ -53,9 +54,10 @@ router.post('/', (req, res) => {
   }
 
   const id = uuidv4();
+  const encrypted = encryptTransaction({ description, merchant, notes }, req.encryptionKey);
   db.prepare(`INSERT INTO transactions (id, user_id, account_id, category_id, type, amount, description, merchant, date, notes, is_recurring, transfer_account_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, req.userId, account_id, category_id, type, amount, description, merchant, date, notes, is_recurring ? 1 : 0, transfer_account_id);
+    .run(id, req.userId, account_id, category_id, type, amount, encrypted.description, encrypted.merchant, date, encrypted.notes, is_recurring ? 1 : 0, transfer_account_id);
 
   // Update account balance
   if (type === 'expense') {
@@ -72,11 +74,12 @@ router.post('/', (req, res) => {
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.id = ?`).get(id);
-  res.status(201).json(transaction);
+  res.status(201).json(decryptTransaction(transaction, req.encryptionKey));
 });
 
 router.put('/:id', (req, res) => {
   const { account_id, category_id, type, amount, description, merchant, date, notes } = req.body;
+  const encrypted = encryptTransaction({ description, merchant, notes }, req.encryptionKey);
   db.prepare(`UPDATE transactions SET
     account_id = COALESCE(?, account_id),
     category_id = COALESCE(?, category_id),
@@ -88,14 +91,14 @@ router.put('/:id', (req, res) => {
     notes = COALESCE(?, notes),
     updated_at = datetime('now')
     WHERE id = ? AND user_id = ?`)
-    .run(account_id, category_id, type, amount, description, merchant, date, notes, req.params.id, req.userId);
+    .run(account_id, category_id, type, amount, encrypted.description, encrypted.merchant, date, encrypted.notes, req.params.id, req.userId);
 
   const transaction = db.prepare(`SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color, a.name as account_name
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN accounts a ON t.account_id = a.id
     WHERE t.id = ?`).get(req.params.id);
-  res.json(transaction);
+  res.json(decryptTransaction(transaction, req.encryptionKey));
 });
 
 router.delete('/:id', (req, res) => {

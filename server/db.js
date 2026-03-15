@@ -15,7 +15,9 @@ const SCHEMA = `
     name TEXT NOT NULL,
     currency TEXT DEFAULT 'USD',
     created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    updated_at TEXT DEFAULT (datetime('now')),
+    encrypted_key TEXT,
+    is_encrypted INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS accounts (
@@ -56,8 +58,20 @@ const SCHEMA = `
     notes TEXT,
     is_recurring INTEGER DEFAULT 0,
     transfer_account_id TEXT REFERENCES accounts(id),
+    import_hash TEXT,
+    source TEXT DEFAULT 'manual',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS imports (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    filename TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    transaction_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS budgets (
@@ -120,6 +134,8 @@ const SCHEMA = `
   CREATE INDEX IF NOT EXISTS idx_bills_user ON bills(user_id);
   CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
   CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts(user_id);
+  CREATE INDEX IF NOT EXISTS idx_transactions_import_hash ON transactions(import_hash);
+  CREATE INDEX IF NOT EXISTS idx_imports_user ON imports(user_id);
 `;
 
 function saveSync() {

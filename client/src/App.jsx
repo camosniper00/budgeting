@@ -10,6 +10,7 @@ import Goals from './pages/Goals';
 import Trends from './pages/Trends';
 import NetWorth from './pages/NetWorth';
 import Settings from './pages/Settings';
+import Import from './pages/Import';
 import Login from './pages/Login';
 
 function PrivateRoute({ children }) {
@@ -37,6 +38,7 @@ function AppRoutes() {
                 <Route path="/transactions" element={<Transactions />} />
                 <Route path="/budgets" element={<Budgets />} />
                 <Route path="/accounts" element={<Accounts />} />
+                <Route path="/import" element={<Import />} />
                 <Route path="/bills" element={<Bills />} />
                 <Route path="/goals" element={<Goals />} />
                 <Route path="/trends" element={<Trends />} />
