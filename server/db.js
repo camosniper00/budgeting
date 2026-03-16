@@ -17,7 +17,8 @@ const SCHEMA = `
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now')),
     encrypted_key TEXT,
-    is_encrypted INTEGER DEFAULT 0
+    is_encrypted INTEGER DEFAULT 0,
+    setup_completed INTEGER DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS accounts (
@@ -156,6 +157,12 @@ const db = {
     }
     _sqlDb.run('PRAGMA foreign_keys = ON');
     _sqlDb.exec(SCHEMA);
+    // Migrate: add setup_completed column if missing
+    try {
+      _sqlDb.exec("ALTER TABLE users ADD COLUMN setup_completed INTEGER DEFAULT 0");
+    } catch (e) {
+      // Column already exists
+    }
     saveSync();
     return db;
   },

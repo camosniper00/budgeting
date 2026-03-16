@@ -61,6 +61,17 @@ export function AuthProvider({ children }) {
     return data;
   }
 
+  async function completeSetup() {
+    const res = await fetch('/api/auth/complete-setup', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setUser(prev => ({ ...prev, setup_completed: 1 }));
+    return data;
+  }
+
   function logout() {
     localStorage.removeItem('token');
     setToken(null);
@@ -68,7 +79,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, completeSetup }}>
       {children}
     </AuthContext.Provider>
   );

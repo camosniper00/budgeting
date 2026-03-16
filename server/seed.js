@@ -21,7 +21,7 @@ async function seed() {
   const userId = uuidv4();
   const passwordHash = bcrypt.hashSync('demo123', 10);
 
-  db.prepare(`INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)`)
+  db.prepare(`INSERT INTO users (id, email, password_hash, name, setup_completed) VALUES (?, ?, ?, ?, 1)`)
     .run(userId, 'demo@budget.app', passwordHash, 'Demo User');
 
   // Create categories
