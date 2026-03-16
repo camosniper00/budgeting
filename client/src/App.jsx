@@ -20,9 +20,16 @@ function PrivateRoute({ children }) {
   const location = useLocation();
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
   if (!user) return <Navigate to="/login" />;
-  if (!user.setup_completed && location.pathname !== '/setup') return <Navigate to="/setup" />;
-  if (user.setup_completed && location.pathname === '/setup') return <Navigate to="/" />;
+  const setupDone = user.setup_completed === 1;
+  if (!setupDone && location.pathname !== '/setup') return <Navigate to="/setup" replace />;
+  if (setupDone && location.pathname === '/setup') return <Navigate to="/" replace />;
   return children;
+}
+
+function LoginRedirect() {
+  const { user } = useAuth();
+  if (!user) return null;
+  return <Navigate to={user.setup_completed === 1 ? '/' : '/setup'} replace />;
 }
 
 function AppRoutes() {
@@ -32,7 +39,7 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+      <Route path="/login" element={user ? <LoginRedirect /> : <Login />} />
       <Route path="/setup" element={
         <PrivateRoute>
           <Setup />
