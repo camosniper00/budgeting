@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 
 export default function Login() {
   const { login, register } = useAuth();
+  const navigate = useNavigate();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('demo@budget.app');
   const [password, setPassword] = useState('demo123');
@@ -21,8 +23,10 @@ export default function Login() {
     try {
       if (isRegister) {
         await register(email, password, name);
+        navigate('/setup', { replace: true });
       } else {
-        await login(email, password);
+        const data = await login(email, password);
+        navigate(data.user.setup_completed === 1 ? '/' : '/setup', { replace: true });
       }
     } catch (err) {
       setError(err.message);
