@@ -1,7 +1,28 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import Modal from '../components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+const ICONS = ['📦', '🏠', '🚗', '🍔', '🛒', '💡', '🏥', '🎬', '🛍️', '💆', '📚', '🛡️', '📱', '✈️', '🎁', '🐾', '💼', '💻', '📈', '💰'];
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -40,126 +61,161 @@ export default function Settings() {
     }
   }
 
-  const ICONS = ['📦', '🏠', '🚗', '🍔', '🛒', '💡', '🏥', '🎬', '🛍️', '💆', '📚', '🛡️', '📱', '✈️', '🎁', '🐾', '💼', '💻', '📈', '💰'];
-
   return (
-    <div>
-      <div className="page-header">
-        <h1>Settings</h1>
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Settings</h1>
 
-      <div className="grid grid-2" style={{ alignItems: 'start' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Profile */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Profile</span>
-          </div>
-          <form onSubmit={handleSaveProfile}>
-            <div className="form-group">
-              <label>Name</label>
-              <input className="form-control" value={name} onChange={e => setName(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input className="form-control" value={user?.email || ''} disabled style={{ background: 'var(--bg-primary)' }} />
-            </div>
-            <div className="form-group">
-              <label>Currency</label>
-              <select className="form-control" value={currency} onChange={e => setCurrency(e.target.value)}>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="CAD">CAD</option>
-                <option value="AUD">AUD</option>
-                <option value="JPY">JPY</option>
-              </select>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <button type="submit" className="btn btn-primary">Save Changes</button>
-              {saved && <span className="text-success" style={{ fontSize: '0.875rem' }}>Saved!</span>}
-            </div>
-          </form>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Profile</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input value={user?.email || ''} disabled className="bg-muted" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectItem value="GBP">GBP (£)</SelectItem>
+                    <SelectItem value="CAD">CAD ($)</SelectItem>
+                    <SelectItem value="AUD">AUD ($)</SelectItem>
+                    <SelectItem value="JPY">JPY (¥)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="submit">Save Changes</Button>
+                {saved && <span className="text-sm text-success font-medium">Saved!</span>}
+              </div>
+            </form>
 
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border-color)' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--color-danger)' }}>Danger Zone</h3>
-            <button className="btn btn-danger" onClick={logout}>Log Out</button>
-          </div>
-        </div>
+            <Separator className="my-5" />
+            <div>
+              <p className="text-sm font-semibold text-destructive mb-3">Danger Zone</p>
+              <Button variant="destructive" onClick={logout}>Log Out</Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Categories */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Categories</span>
-            <button className="btn btn-sm btn-primary" onClick={() => { setCatForm({ name: '', type: 'expense', icon: '📦', color: '#6B7280' }); setCatModalOpen(true); }}>
-              + Add
-            </button>
-          </div>
-          <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-            {['income', 'expense', 'transfer'].map(type => {
-              const typeCats = categories.filter(c => c.type === type);
-              if (typeCats.length === 0) return null;
-              return (
-                <div key={type} style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
-                    {type}
-                  </div>
-                  {typeCats.map(cat => (
-                    <div key={cat.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: cat.color }} />
-                        <span>{cat.icon} {cat.name}</span>
-                      </div>
-                      {!cat.is_system && (
-                        <button className="btn-icon" onClick={() => handleDeleteCategory(cat.id)} style={{ color: 'var(--color-danger)', width: 28, height: 28 }}>
-                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        </button>
-                      )}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Categories</CardTitle>
+              <Button
+                size="sm"
+                onClick={() => { setCatForm({ name: '', type: 'expense', icon: '📦', color: '#6B7280' }); setCatModalOpen(true); }}
+              >
+                + Add
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-[500px] overflow-y-auto space-y-4">
+              {['income', 'expense', 'transfer'].map(type => {
+                const typeCats = categories.filter(c => c.type === type);
+                if (typeCats.length === 0) return null;
+                return (
+                  <div key={type}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">{type}</p>
+                    <div className="space-y-0">
+                      {typeCats.map((cat, i) => (
+                        <div key={cat.id}>
+                          <div className="flex justify-between items-center py-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                              <span className="text-sm">{cat.icon} {cat.name}</span>
+                            </div>
+                            {!cat.is_system && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteCategory(cat.id)}
+                              >
+                                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              </Button>
+                            )}
+                          </div>
+                          {i < typeCats.length - 1 && <Separator />}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)} title="Add Category">
-        <form onSubmit={handleAddCategory}>
-          <div className="form-group">
-            <label>Category Name</label>
-            <input className="form-control" value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} required />
-          </div>
-          <div className="form-group">
-            <label>Type</label>
-            <select className="form-control" value={catForm.type} onChange={e => setCatForm(f => ({ ...f, type: e.target.value }))}>
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-              <option value="transfer">Transfer</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Icon</label>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {ICONS.map(icon => (
-                <button key={icon} type="button" onClick={() => setCatForm(f => ({ ...f, icon }))} style={{
-                  width: 32, height: 32, borderRadius: 6, fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: catForm.icon === icon ? '2px solid var(--color-primary)' : '2px solid var(--border-color)', background: catForm.icon === icon ? 'var(--color-primary)10' : 'transparent'
-                }}>
-                  {icon}
-                </button>
-              ))}
+      <Dialog open={catModalOpen} onOpenChange={open => !open && setCatModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Category</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddCategory} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Category Name</Label>
+              <Input value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} required />
             </div>
-          </div>
-          <div className="form-group">
-            <label>Color</label>
-            <input className="form-control" type="color" value={catForm.color} onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))} style={{ height: 42, padding: 4 }} />
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setCatModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Add Category</button>
-          </div>
-        </form>
-      </Modal>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={catForm.type} onValueChange={v => setCatForm(f => ({ ...f, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Icon</Label>
+              <div className="flex gap-1.5 flex-wrap">
+                {ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setCatForm(f => ({ ...f, icon }))}
+                    className={cn(
+                      'w-8 h-8 rounded-md text-base flex items-center justify-center border-2 transition-colors',
+                      catForm.icon === icon ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Color</Label>
+              <input
+                type="color"
+                value={catForm.color}
+                onChange={e => setCatForm(f => ({ ...f, color: e.target.value }))}
+                className="h-9 w-full rounded-md border border-input cursor-pointer p-1"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setCatModalOpen(false)}>Cancel</Button>
+              <Button type="submit">Add Category</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

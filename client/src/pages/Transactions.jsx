@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-import { formatCurrency, formatDate, getCurrentMonth } from '../utils/format';
-import Modal from '../components/Modal';
+import { formatCurrency, formatDate } from '../utils/format';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const PAGE_SIZE = 20;
 
@@ -31,7 +49,6 @@ export default function Transactions() {
     if (filters.type) params.set('type', filters.type);
     if (filters.category_id) params.set('category_id', filters.category_id);
     if (filters.account_id) params.set('account_id', filters.account_id);
-
     api.get(`/transactions?${params}`).then(data => {
       setTransactions(data.transactions);
       setTotal(data.total);
@@ -69,155 +86,189 @@ export default function Transactions() {
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const expenseCategories = categories.filter(c => c.type === 'expense');
-  const incomeCategories = categories.filter(c => c.type === 'income');
-  const filteredCategories = form.type === 'income' ? incomeCategories : expenseCategories;
+  const filteredCategories = categories.filter(c => c.type === (form.type === 'income' ? 'income' : 'expense'));
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Transactions</h1>
-        <button className="btn btn-primary" onClick={openAdd}>+ Add Transaction</button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Transactions</h1>
+        <Button onClick={openAdd}>+ Add Transaction</Button>
       </div>
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        <div className="filter-bar">
-          <input className="form-control" placeholder="Search transactions..." value={filters.search} onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0); }} style={{ minWidth: 220 }} />
-          <select className="form-control" value={filters.type} onChange={e => { setFilters(f => ({ ...f, type: e.target.value })); setPage(0); }}>
-            <option value="">All Types</option>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
-            <option value="transfer">Transfer</option>
-          </select>
-          <select className="form-control" value={filters.category_id} onChange={e => { setFilters(f => ({ ...f, category_id: e.target.value })); setPage(0); }}>
-            <option value="">All Categories</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-          </select>
-          <select className="form-control" value={filters.account_id} onChange={e => { setFilters(f => ({ ...f, account_id: e.target.value })); setPage(0); }}>
-            <option value="">All Accounts</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap gap-3">
+            <Input
+              placeholder="Search transactions..."
+              value={filters.search}
+              onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0); }}
+              className="min-w-[200px] flex-1"
+            />
+            <select
+              className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.type}
+              onChange={e => { setFilters(f => ({ ...f, type: e.target.value })); setPage(0); }}
+            >
+              <option value="">All Types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+              <option value="transfer">Transfer</option>
+            </select>
+            <select
+              className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.category_id}
+              onChange={e => { setFilters(f => ({ ...f, category_id: e.target.value })); setPage(0); }}
+            >
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+            </select>
+            <select
+              className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={filters.account_id}
+              onChange={e => { setFilters(f => ({ ...f, account_id: e.target.value })); setPage(0); }}
+            >
+              <option value="">All Accounts</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Account</th>
-                <th style={{ textAlign: 'right' }}>Amount</th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map(tx => (
-                <tr key={tx.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{formatDate(tx.date)}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{tx.description}</div>
-                    {tx.merchant && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tx.merchant}</div>}
-                  </td>
-                  <td>
-                    {tx.category_name && (
-                      <span className="badge" style={{ background: tx.category_color + '20', color: tx.category_color }}>
-                        {tx.category_icon} {tx.category_name}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ color: 'var(--text-secondary)' }}>{tx.account_name}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600, color: tx.type === 'income' ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn-icon" onClick={() => openEdit(tx)} title="Edit">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      <button className="btn-icon" onClick={() => handleDelete(tx.id)} title="Delete" style={{ color: 'var(--color-danger)' }}>
-                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                    </div>
-                  </td>
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">Amount</th>
+                  <th className="w-20"></th>
                 </tr>
-              ))}
-              {transactions.length === 0 && (
-                <tr><td colSpan="6" className="empty-state">No transactions found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {transactions.map(tx => (
+                  <tr key={tx.id} className="border-b last:border-0 hover:bg-muted/50">
+                    <td className="px-4 py-3 whitespace-nowrap">{formatDate(tx.date)}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{tx.description}</div>
+                      {tx.merchant && <div className="text-xs text-muted-foreground">{tx.merchant}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {tx.category_name && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium" style={{ background: tx.category_color + '20', color: tx.category_color }}>
+                          {tx.category_icon} {tx.category_name}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{tx.account_name}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${tx.type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                      {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(tx)}>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(tx.id)}>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {transactions.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-4 py-12 text-center text-muted-foreground">No transactions found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {total > PAGE_SIZE && (
-          <div className="pagination">
-            <span>Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
-            <div className="pagination-buttons">
-              <button className="btn btn-sm btn-secondary" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button>
-              <button className="btn btn-sm btn-secondary" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next</button>
+          {total > PAGE_SIZE && (
+            <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+              <span>Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</Button>
+                <Button variant="secondary" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next</Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editTx ? 'Edit Transaction' : 'Add Transaction'}>
-        <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Type</label>
-              <select className="form-control" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value, category_id: '' }))}>
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-                <option value="transfer">Transfer</option>
-              </select>
+      <Dialog open={modalOpen} onOpenChange={open => !open && setModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editTx ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v, category_id: '' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="income">Income</SelectItem>
+                    <SelectItem value="transfer">Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Amount</Label>
+                <Input type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
+              </div>
             </div>
-            <div className="form-group">
-              <label>Amount</label>
-              <input className="form-control" type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required />
             </div>
-          </div>
-          <div className="form-group">
-            <label>Description</label>
-            <input className="form-control" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} required />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Merchant</label>
-              <input className="form-control" value={form.merchant} onChange={e => setForm(f => ({ ...f, merchant: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Merchant</Label>
+                <Input value={form.merchant} onChange={e => setForm(f => ({ ...f, merchant: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date</Label>
+                <Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
+              </div>
             </div>
-            <div className="form-group">
-              <label>Date</label>
-              <input className="form-control" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} required />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Account</Label>
+                <Select value={String(form.account_id)} onValueChange={v => setForm(f => ({ ...f, account_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={String(form.category_id)} onValueChange={v => setForm(f => ({ ...f, category_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Uncategorized" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Uncategorized</SelectItem>
+                    {filteredCategories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.icon} {c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Account</label>
-              <select className="form-control" value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))} required>
-                <option value="">Select account</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
             </div>
-            <div className="form-group">
-              <label>Category</label>
-              <select className="form-control" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}>
-                <option value="">Uncategorized</option>
-                {filteredCategories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Notes</label>
-            <textarea className="form-control" rows="2" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">{editTx ? 'Update' : 'Add'} Transaction</button>
-          </div>
-        </form>
-      </Modal>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button type="submit">{editTx ? 'Update' : 'Add'} Transaction</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

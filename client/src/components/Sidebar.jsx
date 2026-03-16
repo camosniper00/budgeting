@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1' },
@@ -19,19 +20,9 @@ export default function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside style={{
-      width: 'var(--sidebar-width)',
-      background: 'var(--bg-sidebar)',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      bottom: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 100,
-    }}>
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <h1 style={{ color: 'white', fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <aside className="w-[240px] bg-sidebar fixed top-0 left-0 bottom-0 flex flex-col z-[100]">
+      <div className="px-5 py-4 border-b border-white/10">
+        <h1 className="text-white text-xl font-bold flex items-center gap-2">
           <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
             <rect width="32" height="32" rx="8" fill="#4F46E5"/>
             <circle cx="16" cy="16" r="6" fill="white" fillOpacity="0.9"/>
@@ -41,35 +32,18 @@ export default function Sidebar() {
         </h1>
       </div>
 
-      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+      <nav className="flex-1 px-2 py-3 overflow-y-auto">
         {navItems.map(item => (
           <NavLink
             key={item.path}
             to={item.path}
             end={item.path === '/'}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '10px 12px',
-              borderRadius: 8,
-              color: isActive ? 'var(--text-sidebar-active)' : 'var(--text-sidebar)',
-              background: isActive ? 'var(--bg-sidebar-active)' : 'transparent',
-              fontSize: '0.875rem',
-              fontWeight: isActive ? 500 : 400,
-              marginBottom: 2,
-              transition: 'all 0.15s ease',
-            })}
-            onMouseEnter={e => {
-              if (!e.currentTarget.classList.contains('active')) {
-                e.currentTarget.style.background = 'var(--bg-sidebar-hover)';
-              }
-            }}
-            onMouseLeave={e => {
-              if (!e.currentTarget.classList.contains('active')) {
-                e.currentTarget.style.background = '';
-              }
-            }}
+            className={({ isActive }) => cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-0.5 transition-colors',
+              isActive
+                ? 'bg-sidebar-active text-white font-medium'
+                : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-white'
+            )}
           >
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
               <path d={item.icon} />
@@ -79,15 +53,15 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="px-4 py-4 border-t border-white/10">
+        <div className="flex items-center justify-between">
           <div>
-            <div style={{ color: 'white', fontSize: '0.875rem', fontWeight: 500 }}>{user?.name}</div>
-            <div style={{ color: 'var(--text-sidebar)', fontSize: '0.75rem' }}>{user?.email}</div>
+            <div className="text-white text-sm font-medium">{user?.name}</div>
+            <div className="text-sidebar-foreground text-xs">{user?.email}</div>
           </div>
           <button
             onClick={logout}
-            style={{ color: 'var(--text-sidebar)', padding: 4 }}
+            className="text-sidebar-foreground hover:text-white p-1 transition-colors"
             title="Logout"
           >
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
