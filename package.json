@@ -12,6 +12,7 @@
     "db:seed": "cd server && node seed.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "bcryptjs": "^2.4.3",
     "concurrently": "^8.2.2",
     "cors": "^2.8.5",
