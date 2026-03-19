@@ -235,11 +235,13 @@ function tickPhysics() {
     }
   }
 
-  // Clear explosions after broadcasting once
+  // Always broadcast during active simulation so clients see projectile
+  // positions and worm physics (knockback, falling) in real time.
+  const wormsMoving = worms.some(w => !w.dead && (Math.abs(w.vx) > 0.05 || Math.abs(w.vy) > 0.05 || !w.onGround));
   if (explosions.length > 0) {
     broadcastState();
     explosions = [];
-  } else if (toExplode.length > 0 || toRemove.size > 0) {
+  } else if (projectiles.length > 0 || toExplode.length > 0 || toRemove.size > 0 || wormsMoving) {
     broadcastState();
   }
 
