@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Worms Multiplayer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #1a1a2e; color: #eee; font-family: 'Segoe UI', sans-serif; overflow: hidden; user-select: none; }
+
+    #app { display: flex; flex-direction: column; align-items: center; height: 100vh; }
+
+    /* ── Join screen ── */
+    #joinScreen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; gap: 18px;
+    }
+    #joinScreen h1 { font-size: 3rem; color: #7cfc00; text-shadow: 0 0 20px #7cfc0066; letter-spacing: 4px; }
+    #joinScreen p  { color: #aaa; font-size: 1rem; }
+    #joinScreen input {
+      padding: 12px 20px; font-size: 1.1rem; border-radius: 8px;
+      border: 2px solid #7cfc00; background: #0f0f1a; color: #eee;
+      outline: none; text-align: center; width: 260px;
+    }
+    #joinScreen button {
+      padding: 12px 36px; font-size: 1.1rem; border-radius: 8px;
+      border: none; background: #7cfc00; color: #111; font-weight: bold;
+      cursor: pointer; transition: transform 0.1s;
+    }
+    #joinScreen button:hover { transform: scale(1.05); }
+
+    /* ── Game screen ── */
+    #gameScreen { display: none; flex-direction: column; width: 100%; height: 100vh; position: relative; }
+
+    #canvasWrap { position: relative; width: 1200px; height: 600px; margin: 0 auto; flex-shrink: 0; }
+    canvas { display: block; border-radius: 0 0 8px 8px; }
+
+    /* ── HUD ── */
+    #hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 8px 12px; pointer-events: none; z-index: 10;
+    }
+    .hud-panel {
+      background: rgba(0,0,0,0.65); border-radius: 8px; padding: 8px 12px;
+      pointer-events: auto; font-size: 0.85rem; min-width: 170px;
+    }
+    .hud-name { font-weight: bold; font-size: 1rem; margin-bottom: 4px; }
+    .health-bar { height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin: 3px 0; }
+    .health-fill { height: 100%; background: linear-gradient(90deg, #ff4444, #7cfc00); border-radius: 5px; transition: width 0.3s; }
+    .money { color: #ffd700; font-size: 0.9rem; }
+    .weapons-list { margin-top: 6px; font-size: 0.78rem; color: #aaa; }
+    .weapon-item { cursor: pointer; padding: 2px 5px; border-radius: 4px; }
+    .weapon-item:hover { background: rgba(255,255,255,0.1); }
+    .weapon-item.selected { background: rgba(124,252,0,0.25); color: #7cfc00; }
+
+    #turnBanner {
+      position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.75); border-radius: 8px; padding: 6px 20px;
+      text-align: center; pointer-events: none; z-index: 10;
+    }
+    #turnLabel { font-size: 1rem; font-weight: bold; color: #7cfc00; }
+    #timerBar {
+      height: 6px; background: #333; border-radius: 3px; overflow: hidden; margin-top: 4px; width: 200px;
+    }
+    #timerFill { height: 100%; background: #7cfc00; border-radius: 3px; transition: width 0.3s; }
+
+    /* ── Crosshair / aim indicator (drawn on canvas) ── */
+
+    /* ── Controls ── */
+    #controls {
+      position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.65); border-radius: 8px; padding: 6px 14px;
+      font-size: 0.75rem; color: #888; pointer-events: none; z-index: 10; white-space: nowrap;
+    }
+
+    /* ── Shop ── */
+    #shopBtn {
+      position: absolute; bottom: 8px; right: 12px; z-index: 10;
+      padding: 8px 16px; border-radius: 8px; border: 2px solid #ffd700;
+      background: rgba(0,0,0,0.7); color: #ffd700; cursor: pointer; font-size: 0.85rem;
+      display: none;
+    }
+    #shopBtn:hover { background: rgba(255,215,0,0.15); }
+
+    #shopOverlay {
+      display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.78);
+      align-items: center; justify-content: center; z-index: 20;
+    }
+    #shopOverlay.open { display: flex; }
+    #shopBox {
+      background: #1a1a2e; border: 2px solid #7cfc00; border-radius: 12px;
+      padding: 24px; min-width: 440px; max-width: 560px;
+    }
+    #shopBox h2 { color: #7cfc00; margin-bottom: 4px; }
+    #shopBalance { color: #ffd700; font-size: 0.9rem; margin-bottom: 14px; }
+    .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .shop-item {
+      border: 1px solid #333; border-radius: 8px; padding: 10px 12px;
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      background: rgba(255,255,255,0.03);
+    }
+    .shop-item:hover { border-color: #ffd700; background: rgba(255,215,0,0.07); }
+    .shop-item .w-name { font-weight: bold; font-size: 0.9rem; }
+    .shop-item .w-desc { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+    .shop-item .w-price { font-size: 0.85rem; color: #ffd700; margin-top: 4px; }
+    .shop-item.cant-afford { opacity: 0.4; cursor: default; }
+    #shopClose {
+      margin-top: 16px; padding: 8px 20px; border-radius: 8px; border: none;
+      background: #7cfc00; color: #111; font-weight: bold; cursor: pointer; width: 100%;
+    }
+    #shopNote { font-size: 0.8rem; color: #888; margin-top: 8px; text-align: center; }
+
+    /* ── Game over ── */
+    #gameOver {
+      display: none; position: absolute; inset: 0;
+      background: rgba(0,0,0,0.85); align-items: center; justify-content: center;
+      z-index: 30; flex-direction: column; gap: 16px;
+    }
+    #gameOver.show { display: flex; }
+    #gameOver h2 { font-size: 2.5rem; color: #7cfc00; }
+    #gameOver p  { color: #aaa; }
+    #gameOver button {
+      padding: 12px 28px; border-radius: 8px; border: none;
+      background: #7cfc00; color: #111; font-weight: bold; cursor: pointer; font-size: 1rem;
+    }
+
+    /* ── Power bar ── */
+    #powerBar {
+      position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); border-radius: 8px; padding: 6px 12px;
+      z-index: 10; display: none; align-items: center; gap: 8px;
+    }
+    #powerBar span { font-size: 0.8rem; color: #aaa; }
+    #powerTrack { width: 120px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; }
+    #powerFill { height: 100%; background: linear-gradient(90deg, #7cfc00, #ff4444); border-radius: 5px; width: 0%; }
+
+    /* ── Notifications ── */
+    #notif {
+      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.8); border-radius: 8px; padding: 6px 16px;
+      font-size: 0.9rem; z-index: 15; opacity: 0; transition: opacity 0.4s;
+      pointer-events: none; white-space: nowrap;
+    }
+    #notif.show { opacity: 1; }
+
+    /* ── Wait screen ── */
+    #waitMsg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      background: rgba(0,0,0,0.75); border-radius: 12px; padding: 24px 40px;
+      text-align: center; z-index: 10; font-size: 1.1rem; color: #7cfc00;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Join Screen -->
+  <div id="joinScreen">
+    <h1>🪱 WORMS</h1>
+    <p>Multiplayer artillery game — last worm standing wins!</p>
+    <input id="nameInput" placeholder="Enter your name" maxlength="16" />
+    <button id="joinBtn">Join Game</button>
+    <p style="color:#555; font-size:0.8rem">Share your IP + port 3001 with friends to play together</p>
+  </div>
+
+  <!-- Game Screen -->
+  <div id="gameScreen">
+    <div id="canvasWrap">
+      <canvas id="gameCanvas" width="1200" height="600"></canvas>
+
+      <!-- HUD -->
+      <div id="hud">
+        <div id="hudLeft"  class="hud-panel"></div>
+        <div id="turnBanner">
+          <div id="turnLabel">Waiting…</div>
+          <div id="timerBar"><div id="timerFill"></div></div>
+        </div>
+        <div id="hudRight" class="hud-panel"></div>
+      </div>
+
+      <!-- Power bar -->
+      <div id="powerBar">
+        <span>Power</span>
+        <div id="powerTrack"><div id="powerFill"></div></div>
+        <span id="powerPct">0%</span>
+      </div>
+
+      <!-- Controls hint -->
+      <div id="controls">
+        ← → Move &nbsp;|&nbsp; ↑ Jump &nbsp;|&nbsp; Mouse: Aim &nbsp;|&nbsp; Hold LMB: Charge &amp; Fire &nbsp;|&nbsp; [1-7]: Select Weapon &nbsp;|&nbsp; [E]: End Turn &nbsp;|&nbsp; [$]: Shop
+      </div>
+
+      <!-- Shop button -->
+      <button id="shopBtn">💰 Shop</button>
+
+      <!-- Shop overlay -->
+      <div id="shopOverlay">
+        <div id="shopBox">
+          <h2>💰 Weapons Shop</h2>
+          <div id="shopBalance"></div>
+          <div class="shop-grid" id="shopGrid"></div>
+          <button id="shopClose">Close Shop</button>
+          <p id="shopNote">Earn money by hitting enemies!</p>
+        </div>
+      </div>
+
+      <!-- Game over -->
+      <div id="gameOver">
+        <h2 id="gameOverTitle">Winner!</h2>
+        <p id="gameOverSub"></p>
+        <button id="restartBtn">Play Again</button>
+      </div>
+
+      <!-- Waiting for players -->
+      <div id="waitMsg" style="display:none">
+        Waiting for another player to join…<br>
+        <span style="font-size:0.8rem; color:#888; margin-top:8px; display:block">Share your IP and port 3001</span>
+      </div>
+
+      <!-- Notification -->
+      <div id="notif"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/game.js"></script>
+</body>
+</html>
