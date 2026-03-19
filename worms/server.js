@@ -113,6 +113,8 @@ let gameLoopHandle = null;
 const TICK = 1000 / 60;
 let terrainDirty = true;  // send terrain to clients only when it changes
 let turnMoveLeft = MAX_MOVE_DISTANCE;
+let lastPhysicsBroadcast = 0;
+const PHYSICS_BROADCAST_MS = 50; // cap physics state to ~20fps so clients aren't flooded
 
 function spawnWorm(socketId, name, teamIndex) {
   const x = teamIndex === 0 ? W * 0.2 : W * 0.8;
@@ -264,14 +266,19 @@ function tickPhysics() {
     }
   }
 
-  // Always broadcast during active simulation so clients see projectile
-  // positions and worm physics (knockback, falling) in real time.
-  const wormsMoving = worms.some(w => !w.dead && (Math.abs(w.vx) > 0.05 || Math.abs(w.vy) > 0.05 || !w.onGround));
+  // Broadcast physics state at most 20fps to avoid flooding clients with
+  // DOM-heavy state updates. Explosions always broadcast immediately.
+  const now = Date.now();
+  const wormsMoving = worms.some(w => !w.dead && (Math.abs(w.vx) > 0.1 || Math.abs(w.vy) > 0.1 || !w.onGround));
   if (explosions.length > 0) {
     broadcastState();
+    lastPhysicsBroadcast = now;
     explosions = [];
   } else if (projectiles.length > 0 || toExplode.length > 0 || toRemove.size > 0 || wormsMoving) {
-    broadcastState();
+    if (now - lastPhysicsBroadcast >= PHYSICS_BROADCAST_MS) {
+      broadcastState();
+      lastPhysicsBroadcast = now;
+    }
   }
 
   checkVictory();

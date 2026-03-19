@@ -23,6 +23,7 @@ const socket = io();
 let myId = null;
 let gameState = null;
 let isMyTurn = false;
+let lastHUDUpdate = 0;
 
 // Input
 const keys = {};
@@ -88,6 +89,7 @@ socket.on('joinError', msg => {
 
 // ─── Game state updates ────────────────────────────────────────────────────────
 socket.on('state', (state) => {
+  const prevTurnWormId = gameState?.turnWormId;
   const prevPhase = gameState?.gamePhase;
   gameState = state;
   isMyTurn = state.turnWormId === myId;
@@ -103,10 +105,17 @@ socket.on('state', (state) => {
     }
   }
 
-  updateHUD();
-  updateWaitMsg();
-  updateShopBtn();
-  updateTimerBar();
+  // HUD rebuilds innerHTML — throttle to ~10fps to avoid browser freeze
+  // during high-frequency physics broadcasts. Always update on turn/phase change.
+  const now = Date.now();
+  const importantChange = state.turnWormId !== prevTurnWormId || state.gamePhase !== prevPhase;
+  if (importantChange || now - lastHUDUpdate >= 100) {
+    updateHUD();
+    updateWaitMsg();
+    updateShopBtn();
+    updateTimerBar();
+    lastHUDUpdate = now;
+  }
 });
 
 socket.on('gameOver', ({ winnerName, winnerId }) => {
