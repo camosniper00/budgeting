@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 2556;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -577,5 +577,5 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`\n🪱 Worms game running at http://localhost:${PORT}`);
-  console.log(`   Port-forward port ${PORT} to play online!\n`);
+  console.log(`   Port-forward port 2556 to play online!\n`);
 });
