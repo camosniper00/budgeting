@@ -190,11 +190,16 @@ function updateHUD() {
         const click = myW ? `onclick="selectWeapon('${k}')"` : '';
         return `<div class="weapon-item${sel}" ${click} title="${def?.name}">[${def?.key}] ${def?.name} ×${amtStr}</div>`;
       }).join('');
+    const moveLeft = (isActive && w.id === myId) ? gameState.turnMoveLeft : null;
+    const moveBar = moveLeft !== null
+      ? `<div style="font-size:0.7rem;color:#aaa;margin-top:2px">Move: <span style="color:${moveLeft > 50 ? '#7cfc00' : moveLeft > 0 ? '#ffd700' : '#ff4444'}">${Math.ceil(moveLeft)}px</span></div>`
+      : '';
     return `
       <div class="hud-name" style="color:${color}">${isActive ? '► ' : ''}${w.name}${w.dead ? ' 💀' : ''}</div>
       <div class="health-bar"><div class="health-fill" style="width:${hp}%"></div></div>
       <div style="font-size:0.75rem; color:#aaa">${hp} HP</div>
       <div class="money">💰 $${w.money}</div>
+      ${moveBar}
       <div class="weapons-list">${wList}</div>`;
   }
 

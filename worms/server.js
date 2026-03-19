@@ -19,7 +19,8 @@ const WORM_W = 20;
 const WORM_H = 24;
 const WORM_SPEED = 2.5;
 const TURN_SECONDS = 35;
-const FIRE_COOLDOWN = 500; // ms before turn ends after firing
+const FIRE_COOLDOWN = 500;   // ms before turn ends after firing
+const MAX_MOVE_DISTANCE = 200; // pixels of movement allowed per turn
 
 const WEAPONS = {
   bazooka:    { name: 'Bazooka',       cost: 0,   damage: 35, radius: 45, speed: 14, type: 'rocket',   color: '#ff6600', ammo: Infinity },
@@ -34,16 +35,38 @@ const WEAPONS = {
 // ─── Terrain ──────────────────────────────────────────────────────────────────
 function generateTerrain() {
   const heights = new Float32Array(W);
-  // Multiple sine waves for natural-looking hills
-  for (let x = 0; x < W; x++) {
-    const h = 0.55 * H
-      + Math.sin(x / 180) * 60
-      + Math.sin(x / 80 + 1.2) * 35
-      + Math.sin(x / 40 + 0.5) * 18
-      + Math.sin(x / 22 + 2.1) * 10;
-    heights[x] = h;
+
+  // Pick a random terrain style each game
+  const style = Math.floor(Math.random() * 4);
+  const baseH = (0.42 + Math.random() * 0.22) * H;
+
+  // Randomised layered sine waves
+  const layers = [
+    { freq: 100 + Math.random() * 180, amp: 25 + Math.random() * 55, phase: Math.random() * Math.PI * 2 },
+    { freq:  45 + Math.random() *  80, amp: 12 + Math.random() * 32, phase: Math.random() * Math.PI * 2 },
+    { freq:  18 + Math.random() *  30, amp:  6 + Math.random() * 16, phase: Math.random() * Math.PI * 2 },
+    { freq:   8 + Math.random() *  14, amp:  2 + Math.random() *  8, phase: Math.random() * Math.PI * 2 },
+  ];
+
+  // Style overrides
+  if (style === 1) { // mountains – taller, sharper
+    layers[0].amp *= 1.6;
+    layers[1].amp *= 1.4;
+  } else if (style === 2) { // mostly flat valley
+    layers[0].amp *= 0.4;
+    layers[1].amp *= 0.5;
+  } else if (style === 3) { // plateau: one big ridge in the middle
+    layers[0].freq = 600;
+    layers[0].amp  = 80;
   }
-  // Smooth
+
+  for (let x = 0; x < W; x++) {
+    let h = baseH;
+    for (const l of layers) h += Math.sin(x / l.freq + l.phase) * l.amp;
+    heights[x] = Math.min(H - 60, Math.max(H * 0.18, h));
+  }
+
+  // Smooth pass
   const sm = new Float32Array(W);
   for (let x = 0; x < W; x++) {
     let s = 0, n = 0;
@@ -88,6 +111,8 @@ let turnTimerHandle = null;
 let projIdCounter = 0;
 let gameLoopHandle = null;
 const TICK = 1000 / 60;
+let terrainDirty = true;  // send terrain to clients only when it changes
+let turnMoveLeft = MAX_MOVE_DISTANCE;
 
 function spawnWorm(socketId, name, teamIndex) {
   const x = teamIndex === 0 ? W * 0.2 : W * 0.8;
@@ -123,11 +148,11 @@ function currentWorm() { return liveWorms()[turnIndex % liveWorms().length] || n
 
 function broadcastState() {
   io.emit('state', buildClientState());
+  terrainDirty = false;
 }
 
-function buildClientState() {
-  return {
-    terrain,
+function buildClientState(forceTerrain = false) {
+  const state = {
     worms: worms.map(w => ({
       id: w.id, name: w.name, x: w.x, y: w.y,
       health: w.health, money: w.money, weapons: w.weapons,
@@ -135,14 +160,18 @@ function buildClientState() {
       teamIndex: w.teamIndex,
     })),
     projectiles: projectiles.map(p => ({
-      id: p.id, x: p.x, y: p.y, type: p.type, color: p.color,
+      id: p.id, x: p.x, y: p.y, vx: p.vx, vy: p.vy, type: p.type, color: p.color,
     })),
     explosions,
     gamePhase,
     turnWormId: currentWorm()?.id || null,
     turnEndsAt,
     turnIndex,
+    turnMoveLeft,
   };
+  // Only include terrain data when it has changed to avoid flooding clients
+  if (terrainDirty || forceTerrain) state.terrain = terrain;
+  return state;
 }
 
 // ─── Physics & Game Loop ──────────────────────────────────────────────────────
@@ -309,7 +338,8 @@ function doExplosion(cx, cy, weaponKey, ownerId, proj) {
 
   // Terrain damage
   if (radius > 0) {
-    explodeTerrain(terrain, cx, cy, radius);
+    const changed = explodeTerrain(terrain, cx, cy, radius);
+    if (changed) terrainDirty = true;
   }
 }
 
@@ -336,6 +366,7 @@ function startTurn() {
 
   // Make sure turnIndex is valid
   turnIndex = turnIndex % live.length;
+  turnMoveLeft = MAX_MOVE_DISTANCE;
 
   clearTimeout(turnTimerHandle);
   turnEndsAt = Date.now() + TURN_SECONDS * 1000;
@@ -377,9 +408,13 @@ io.on('connection', (socket) => {
     io.emit('playerJoined', { id: socket.id, name: worm.name });
     broadcastState();
 
+    // Send full state (including terrain) to the newly joined socket
+    socket.emit('state', buildClientState(true));
+
     if (worms.length >= 2 && gamePhase === 'waiting') {
       gamePhase = 'playing';
       terrain = generateTerrain();
+      terrainDirty = true;
       // Reposition worms
       worms.forEach((w, i) => {
         w.x = (W / (worms.length + 1)) * (i + 1);
@@ -395,11 +430,14 @@ io.on('connection', (socket) => {
     const cw = currentWorm();
     if (!cw || cw.id !== socket.id) return;
     if (!cw.onGround) return;
+    if (turnMoveLeft <= 0) return;
 
-    const dx = dir * WORM_SPEED;
+    const step = Math.min(WORM_SPEED, turnMoveLeft);
+    const dx = dir * step;
     cw.x += dx;
     cw.x = Math.max(WORM_W / 2, Math.min(W - WORM_W / 2, cw.x));
     cw.facing = dir > 0 ? 1 : -1;
+    turnMoveLeft -= step;
 
     // Walk up slope
     const ty = terrainY(terrain, cw.x);
@@ -541,6 +579,7 @@ io.on('connection', (socket) => {
 
   socket.on('restartGame', () => {
     terrain = generateTerrain();
+    terrainDirty = true;
     explosions = [];
     projectiles = [];
     turnIndex = 0;
