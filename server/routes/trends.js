@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
+const { decrypt } = require('../utils/encryption');
 
 const router = express.Router();
 router.use(authenticate);
@@ -92,7 +93,10 @@ router.get('/merchants', (req, res) => {
     FROM transactions
     WHERE user_id = ? AND type = 'expense' AND merchant IS NOT NULL AND date >= ? AND date <= ?
     GROUP BY merchant ORDER BY total DESC LIMIT 15
-  `).all(req.userId, start, end);
+  `).all(req.userId, start, end).map(m => ({
+    ...m,
+    merchant: decrypt(m.merchant, req.encryptionKey),
+  }));
 
   res.json(merchants);
 });

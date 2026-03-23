@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db');
 const { authenticate, JWT_SECRET } = require('../middleware/auth');
+const { generateDataKey, encryptDataKey, decryptDataKey, storeKey } = require('../utils/encryption');
 
 const router = express.Router();
 
@@ -20,7 +21,16 @@ router.post('/register', (req, res) => {
 
   const id = uuidv4();
   const passwordHash = bcrypt.hashSync(password, 10);
-  db.prepare('INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)').run(id, email, passwordHash, name);
+
+  // Generate per-user encryption key, encrypted with their password
+  const dataKey = generateDataKey();
+  const { encrypted_key } = encryptDataKey(dataKey, password);
+
+  db.prepare('INSERT INTO users (id, email, password_hash, name, encrypted_key, is_encrypted) VALUES (?, ?, ?, ?, ?, 1)')
+    .run(id, email, passwordHash, name, encrypted_key);
+
+  // Store decrypted key in memory for this session
+  storeKey(id, dataKey);
 
   // Create default categories for new user
   const defaultCategories = [
@@ -44,7 +54,7 @@ router.post('/register', (req, res) => {
   }
 
   const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id, email, name } });
+  res.json({ token, user: { id, email, name, setup_completed: 0 } });
 });
 
 router.post('/login', (req, res) => {
@@ -58,13 +68,37 @@ router.post('/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
+  // Decrypt and store user's data encryption key in memory
+  if (user.encrypted_key) {
+    try {
+      const dataKey = decryptDataKey(user.encrypted_key, password);
+      storeKey(user.id, dataKey);
+    } catch {
+      return res.status(500).json({ error: 'Failed to decrypt encryption key' });
+    }
+  } else {
+    // Migrate existing user: generate encryption key on first login
+    const dataKey = generateDataKey();
+    const { encrypted_key } = encryptDataKey(dataKey, password);
+    db.prepare('UPDATE users SET encrypted_key = ?, is_encrypted = 1, updated_at = datetime(\'now\') WHERE id = ?')
+      .run(encrypted_key, user.id);
+    storeKey(user.id, dataKey);
+  }
+
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user.id, email: user.email, name: user.name, currency: user.currency } });
+  res.json({ token, user: { id: user.id, email: user.email, name: user.name, currency: user.currency, setup_completed: user.setup_completed } });
 });
 
 router.get('/me', authenticate, (req, res) => {
-  const user = db.prepare('SELECT id, email, name, currency, created_at FROM users WHERE id = ?').get(req.userId);
+  const user = db.prepare('SELECT id, email, name, currency, setup_completed, created_at FROM users WHERE id = ?').get(req.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(user);
+});
+
+router.post('/complete-setup', authenticate, (req, res) => {
+  db.prepare('UPDATE users SET setup_completed = 1, updated_at = datetime(\'now\') WHERE id = ?')
+    .run(req.userId);
+  const user = db.prepare('SELECT id, email, name, currency, setup_completed FROM users WHERE id = ?').get(req.userId);
   res.json(user);
 });
 

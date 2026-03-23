@@ -1,7 +1,25 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { formatCurrency, getCurrentMonth, formatMonth, percentOf } from '../utils/format';
-import Modal from '../components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function Budgets() {
   const [data, setData] = useState(null);
@@ -57,124 +75,146 @@ export default function Budgets() {
     setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
 
-  if (!data) return <div className="empty-state">Loading budgets...</div>;
+  if (!data) return <div className="flex items-center justify-center h-64 text-muted-foreground">Loading budgets...</div>;
 
   const overallPct = percentOf(data.totalSpent, data.totalBudget);
   const remaining = data.totalBudget - data.totalSpent;
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Budgets</h1>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button className="btn-icon" onClick={() => changeMonth(-1)}>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Budgets</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => changeMonth(-1)}>
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-            <span style={{ fontWeight: 500, minWidth: 140, textAlign: 'center' }}>{formatMonth(month)}</span>
-            <button className="btn-icon" onClick={() => changeMonth(1)}>
+            </Button>
+            <span className="font-medium min-w-[140px] text-center">{formatMonth(month)}</span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => changeMonth(1)}>
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
+            </Button>
           </div>
-          <button className="btn btn-primary" onClick={openAdd}>+ Add Budget</button>
+          <Button onClick={openAdd}>+ Add Budget</Button>
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-3" style={{ marginBottom: 24 }}>
-        <div className="card stat-card">
-          <div className="stat-label">Total Budgeted</div>
-          <div className="stat-value">{formatCurrency(data.totalBudget)}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Total Spent</div>
-          <div className="stat-value text-danger">{formatCurrency(data.totalSpent)}</div>
-          <div className="progress-bar" style={{ marginTop: 8, height: 6 }}>
-            <div className="progress-fill" style={{ width: `${Math.min(overallPct, 100)}%`, background: overallPct > 100 ? 'var(--color-danger)' : 'var(--color-primary)' }} />
-          </div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Remaining</div>
-          <div className="stat-value" style={{ color: remaining >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-            {formatCurrency(remaining)}
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Budgeted</p>
+            <p className="text-2xl font-bold">{formatCurrency(data.totalBudget)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Spent</p>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(data.totalSpent)}</p>
+            <Progress value={Math.min(overallPct, 100)} className="h-1.5 mt-2" indicatorClassName={overallPct > 100 ? 'bg-destructive' : undefined} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Remaining</p>
+            <p className={`text-2xl font-bold ${remaining >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatCurrency(remaining)}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Budget list */}
-      <div className="grid grid-2">
-        {data.budgets.map(b => {
-          const pct = percentOf(b.spent, b.amount);
-          const over = b.spent > b.amount;
-          return (
-            <div key={b.id} className="card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600 }}>{b.category_icon} {b.category_name}</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{b.period}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button className="btn-icon" onClick={() => openEdit(b)} title="Edit">
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                  <button className="btn-icon" onClick={() => handleDelete(b.id)} title="Delete" style={{ color: 'var(--color-danger)' }}>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: '0.875rem' }}>
-                  <span style={{ fontWeight: 600, color: over ? 'var(--color-danger)' : '' }}>{formatCurrency(b.spent)}</span>
-                  <span className="text-muted"> of {formatCurrency(b.amount)}</span>
-                </span>
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: over ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                  {over ? `${formatCurrency(b.spent - b.amount)} over` : `${formatCurrency(b.amount - b.spent)} left`}
-                </span>
-              </div>
-              <div className="progress-bar" style={{ height: 10 }}>
-                <div className="progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: over ? 'var(--color-danger)' : pct > 80 ? 'var(--color-warning)' : b.category_color }} />
-              </div>
-              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>{pct}% used</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {data.budgets.length === 0 && (
-        <div className="card empty-state">
-          <p>No budgets set up yet. Create your first budget to start tracking spending!</p>
+      {data.budgets.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No budgets set up yet. Create your first budget to start tracking spending!
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.budgets.map(b => {
+            const pct = percentOf(b.spent, b.amount);
+            const over = b.spent > b.amount;
+            return (
+              <Card key={b.id}>
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-semibold">{b.category_icon} {b.category_name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{b.period}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(b)}>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(b.id)}>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>
+                      <span className={`font-semibold ${over ? 'text-destructive' : ''}`}>{formatCurrency(b.spent)}</span>
+                      <span className="text-muted-foreground"> of {formatCurrency(b.amount)}</span>
+                    </span>
+                    <span className={`font-semibold ${over ? 'text-destructive' : 'text-success'}`}>
+                      {over ? `${formatCurrency(b.spent - b.amount)} over` : `${formatCurrency(b.amount - b.spent)} left`}
+                    </span>
+                  </div>
+                  <Progress
+                    value={Math.min(pct, 100)}
+                    className="h-2.5"
+                    indicatorClassName={over ? 'bg-destructive' : pct > 80 ? 'bg-warning' : undefined}
+                  />
+                  <p className="text-right text-xs text-muted-foreground mt-1">{pct}% used</p>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editBudget ? 'Edit Budget' : 'Add Budget'}>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Category</label>
-            <select className="form-control" value={form.category_id} onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))} required disabled={!!editBudget}>
-              <option value="">Select category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-            </select>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Budget Amount</label>
-              <input className="form-control" type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
+      <Dialog open={modalOpen} onOpenChange={open => !open && setModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editBudget ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select
+                value={String(form.category_id)}
+                onValueChange={v => setForm(f => ({ ...f, category_id: v }))}
+                disabled={!!editBudget}
+              >
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.icon} {c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="form-group">
-              <label>Period</label>
-              <select className="form-control" value={form.period} onChange={e => setForm(f => ({ ...f, period: e.target.value }))}>
-                <option value="monthly">Monthly</option>
-                <option value="weekly">Weekly</option>
-                <option value="yearly">Yearly</option>
-              </select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Budget Amount</Label>
+                <Input type="number" step="0.01" min="0" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Period</Label>
+                <Select value={form.period} onValueChange={v => setForm(f => ({ ...f, period: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="yearly">Yearly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">{editBudget ? 'Update' : 'Create'} Budget</button>
-          </div>
-        </form>
-      </Modal>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button type="submit">{editBudget ? 'Update' : 'Create'} Budget</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,7 +1,24 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { formatCurrency } from '../utils/format';
-import Modal from '../components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const ACCOUNT_TYPES = [
   { value: 'checking', label: 'Checking' },
@@ -22,6 +39,50 @@ const TYPE_ICONS = {
   cash: { icon: '💵', color: '#22C55E' },
   other: { icon: '🏛️', color: '#6B7280' },
 };
+
+function AccountCard({ acc, onEdit, onDelete }) {
+  const meta = TYPE_ICONS[acc.type] || TYPE_ICONS.other;
+  const isLiability = ['credit_card', 'loan'].includes(acc.type);
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: meta.color + '18' }}>
+              {meta.icon}
+            </div>
+            <div>
+              <p className="font-semibold">{acc.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{acc.type.replace('_', ' ')}</p>
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(acc)}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => onDelete(acc.id)}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Button>
+          </div>
+        </div>
+        <p className={`mt-4 text-2xl font-bold ${isLiability ? 'text-destructive' : 'text-success'}`}>
+          {formatCurrency(isLiability ? Math.abs(acc.balance) : acc.balance)}
+        </p>
+        {acc.institution && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {acc.institution}{acc.account_number_last4 ? ` ****${acc.account_number_last4}` : ''}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Accounts() {
   const [accounts, setAccounts] = useState([]);
@@ -70,141 +131,106 @@ export default function Accounts() {
   const liabilities = activeAccounts.filter(a => ['credit_card', 'loan'].includes(a.type));
   const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
   const totalLiabilities = liabilities.reduce((s, a) => s + Math.abs(a.balance), 0);
+  const netWorth = totalAssets - totalLiabilities;
 
   return (
-    <div>
-      <div className="page-header">
-        <h1>Accounts</h1>
-        <button className="btn btn-primary" onClick={openAdd}>+ Add Account</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Accounts</h1>
+        <Button onClick={openAdd}>+ Add Account</Button>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: 24 }}>
-        <div className="card stat-card">
-          <div className="stat-label">Total Assets</div>
-          <div className="stat-value text-success">{formatCurrency(totalAssets)}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Total Liabilities</div>
-          <div className="stat-value text-danger">{formatCurrency(totalLiabilities)}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Net Worth</div>
-          <div className="stat-value" style={{ color: totalAssets - totalLiabilities >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
-            {formatCurrency(totalAssets - totalLiabilities)}
-          </div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Assets</p>
+            <p className="text-2xl font-bold text-success">{formatCurrency(totalAssets)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Liabilities</p>
+            <p className="text-2xl font-bold text-destructive">{formatCurrency(totalLiabilities)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Net Worth</p>
+            <p className={`text-2xl font-bold ${netWorth >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatCurrency(netWorth)}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {assets.length > 0 && (
         <>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 12 }}>Assets</h2>
-          <div className="grid grid-3" style={{ marginBottom: 24 }}>
-            {assets.map(acc => {
-              const meta = TYPE_ICONS[acc.type] || TYPE_ICONS.other;
-              return (
-                <div key={acc.id} className="card" style={{ padding: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 12, background: meta.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                        {meta.icon}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{acc.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{acc.type.replace('_', ' ')}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn-icon" onClick={() => openEdit(acc)} title="Edit">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      <button className="btn-icon" onClick={() => handleDelete(acc.id)} style={{ color: 'var(--color-danger)' }}>
-                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 16, fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-success)' }}>
-                    {formatCurrency(acc.balance)}
-                  </div>
-                  {acc.institution && <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>{acc.institution} {acc.account_number_last4 ? `****${acc.account_number_last4}` : ''}</div>}
-                </div>
-              );
-            })}
+          <h2 className="text-lg font-semibold">Assets</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {assets.map(acc => (
+              <AccountCard key={acc.id} acc={acc} onEdit={openEdit} onDelete={handleDelete} />
+            ))}
           </div>
         </>
       )}
 
       {liabilities.length > 0 && (
         <>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 12 }}>Liabilities</h2>
-          <div className="grid grid-3" style={{ marginBottom: 24 }}>
-            {liabilities.map(acc => {
-              const meta = TYPE_ICONS[acc.type] || TYPE_ICONS.other;
-              return (
-                <div key={acc.id} className="card" style={{ padding: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 12, background: meta.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                        {meta.icon}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{acc.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>{acc.type.replace('_', ' ')}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      <button className="btn-icon" onClick={() => openEdit(acc)} title="Edit">
-                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                      <button className="btn-icon" onClick={() => handleDelete(acc.id)} style={{ color: 'var(--color-danger)' }}>
-                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: 16, fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-danger)' }}>
-                    {formatCurrency(Math.abs(acc.balance))}
-                  </div>
-                  {acc.institution && <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: 4 }}>{acc.institution} {acc.account_number_last4 ? `****${acc.account_number_last4}` : ''}</div>}
-                </div>
-              );
-            })}
+          <h2 className="text-lg font-semibold">Liabilities</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {liabilities.map(acc => (
+              <AccountCard key={acc.id} acc={acc} onEdit={openEdit} onDelete={handleDelete} />
+            ))}
           </div>
         </>
       )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editAccount ? 'Edit Account' : 'Add Account'}>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Account Name</label>
-            <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Type</label>
-              <select className="form-control" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                {ACCOUNT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
+      <Dialog open={modalOpen} onOpenChange={open => !open && setModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editAccount ? 'Edit Account' : 'Add Account'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Account Name</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
             </div>
-            <div className="form-group">
-              <label>Current Balance</label>
-              <input className="form-control" type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({ ...f, balance: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select value={form.type} onValueChange={v => setForm(f => ({ ...f, type: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACCOUNT_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Current Balance</Label>
+                <Input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({ ...f, balance: e.target.value }))} />
+              </div>
             </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Institution</label>
-              <input className="form-control" value={form.institution} onChange={e => setForm(f => ({ ...f, institution: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Institution</Label>
+                <Input value={form.institution} onChange={e => setForm(f => ({ ...f, institution: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last 4 Digits</Label>
+                <Input maxLength="4" value={form.account_number_last4} onChange={e => setForm(f => ({ ...f, account_number_last4: e.target.value }))} />
+              </div>
             </div>
-            <div className="form-group">
-              <label>Last 4 Digits</label>
-              <input className="form-control" maxLength="4" value={form.account_number_last4} onChange={e => setForm(f => ({ ...f, account_number_last4: e.target.value }))} />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">{editAccount ? 'Update' : 'Add'} Account</button>
-          </div>
-        </form>
-      </Modal>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button type="submit">{editAccount ? 'Update' : 'Add'} Account</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

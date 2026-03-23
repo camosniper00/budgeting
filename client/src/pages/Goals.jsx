@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import { formatCurrency, formatDate, percentOf } from '../utils/format';
-import Modal from '../components/Modal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+
+const ICONS = ['🎯', '✈️', '🏠', '🚗', '💻', '📱', '🎓', '💒', '🏖️', '🛡️', '💰', '🎁'];
 
 export default function Goals() {
   const [goals, setGoals] = useState([]);
@@ -9,7 +24,7 @@ export default function Goals() {
   const [editGoal, setEditGoal] = useState(null);
   const [addFundsModal, setAddFundsModal] = useState(null);
   const [addAmount, setAddAmount] = useState('');
-  const [form, setForm] = useState({ name: '', target_amount: '', current_amount: '', target_date: '', icon: '🎯', color: '#4F46E5' });
+  const [form, setForm] = useState({ name: '', target_amount: '', current_amount: '0', target_date: '', icon: '🎯', color: '#4F46E5' });
 
   useEffect(() => { fetchGoals(); }, []);
 
@@ -62,72 +77,85 @@ export default function Goals() {
   const totalTarget = activeGoals.reduce((s, g) => s + g.target_amount, 0);
   const totalSaved = activeGoals.reduce((s, g) => s + g.current_amount, 0);
 
-  const ICONS = ['🎯', '✈️', '🏠', '🚗', '💻', '📱', '🎓', '💒', '🏖️', '🛡️', '💰', '🎁'];
-
   return (
-    <div>
-      <div className="page-header">
-        <h1>Savings Goals</h1>
-        <button className="btn btn-primary" onClick={openAdd}>+ New Goal</button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Savings Goals</h1>
+        <Button onClick={openAdd}>+ New Goal</Button>
       </div>
 
-      <div className="grid grid-3" style={{ marginBottom: 24 }}>
-        <div className="card stat-card">
-          <div className="stat-label">Total Goal Amount</div>
-          <div className="stat-value">{formatCurrency(totalTarget)}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Total Saved</div>
-          <div className="stat-value text-success">{formatCurrency(totalSaved)}</div>
-        </div>
-        <div className="card stat-card">
-          <div className="stat-label">Remaining</div>
-          <div className="stat-value">{formatCurrency(totalTarget - totalSaved)}</div>
-        </div>
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Goal Amount</p>
+            <p className="text-2xl font-bold">{formatCurrency(totalTarget)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Total Saved</p>
+            <p className="text-2xl font-bold text-success">{formatCurrency(totalSaved)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Remaining</p>
+            <p className="text-2xl font-bold">{formatCurrency(totalTarget - totalSaved)}</p>
+          </CardContent>
+        </Card>
       </div>
+
+      {goals.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No savings goals yet. Create one to start tracking your progress!
+          </CardContent>
+        </Card>
+      )}
 
       {activeGoals.length > 0 && (
-        <div className="grid grid-2" style={{ marginBottom: 24 }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {activeGoals.map(goal => {
             const pct = percentOf(goal.current_amount, goal.target_amount);
             const remaining = goal.target_amount - goal.current_amount;
             return (
-              <div key={goal.id} className="card" style={{ padding: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 48, height: 48, borderRadius: 12, background: goal.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem' }}>
-                      {goal.icon}
+              <Card key={goal.id}>
+                <CardContent className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                        style={{ background: goal.color + '18' }}>
+                        {goal.icon}
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold">{goal.name}</p>
+                        {goal.target_date && <p className="text-xs text-muted-foreground">Target: {formatDate(goal.target_date)}</p>}
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '1.125rem', fontWeight: 600 }}>{goal.name}</div>
-                      {goal.target_date && <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Target: {formatDate(goal.target_date)}</div>}
+                    <div className="flex gap-1">
+                      <Button size="sm" onClick={() => { setAddFundsModal(goal); setAddAmount(''); }}>+ Add Funds</Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(goal)}>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(goal.id)}>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </Button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button className="btn btn-sm btn-primary" onClick={() => { setAddFundsModal(goal); setAddAmount(''); }}>+ Add Funds</button>
-                    <button className="btn-icon" onClick={() => openEdit(goal)}>
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
-                    <button className="btn-icon" onClick={() => handleDelete(goal.id)} style={{ color: 'var(--color-danger)' }}>
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </button>
+
+                  <div className="flex justify-between mb-2">
+                    <span className="text-xl font-bold">{formatCurrency(goal.current_amount)}</span>
+                    <span className="text-muted-foreground">of {formatCurrency(goal.target_amount)}</span>
                   </div>
-                </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 700 }}>{formatCurrency(goal.current_amount)}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>of {formatCurrency(goal.target_amount)}</span>
-                </div>
+                  <Progress value={Math.min(pct, 100)} className="h-3 mb-2" />
 
-                <div className="progress-bar" style={{ height: 12, marginBottom: 8 }}>
-                  <div className="progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: goal.color }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem' }}>
-                  <span style={{ color: goal.color, fontWeight: 500 }}>{pct}% complete</span>
-                  <span className="text-muted">{formatCurrency(remaining)} remaining</span>
-                </div>
-              </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="font-medium" style={{ color: goal.color }}>{pct}% complete</span>
+                    <span className="text-muted-foreground">{formatCurrency(remaining)} remaining</span>
+                  </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
@@ -135,91 +163,109 @@ export default function Goals() {
 
       {completedGoals.length > 0 && (
         <>
-          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 12, color: 'var(--color-success)' }}>Completed Goals</h2>
-          <div className="grid grid-3">
+          <h2 className="text-lg font-semibold text-success">Completed Goals</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {completedGoals.map(goal => (
-              <div key={goal.id} className="card" style={{ padding: 16, opacity: 0.8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span>{goal.icon}</span>
-                  <span style={{ fontWeight: 500 }}>{goal.name}</span>
-                  <span className="badge badge-success">Complete</span>
-                </div>
-                <div style={{ fontWeight: 600 }}>{formatCurrency(goal.target_amount)}</div>
-              </div>
+              <Card key={goal.id} className="opacity-80">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span>{goal.icon}</span>
+                    <span className="font-medium">{goal.name}</span>
+                    <Badge variant="success">Complete</Badge>
+                  </div>
+                  <p className="font-semibold">{formatCurrency(goal.target_amount)}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </>
       )}
 
-      {goals.length === 0 && (
-        <div className="card empty-state">
-          <p>No savings goals yet. Create one to start tracking your progress!</p>
-        </div>
-      )}
+      {/* Goal form modal */}
+      <Dialog open={modalOpen} onOpenChange={open => !open && setModalOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editGoal ? 'Edit Goal' : 'New Goal'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Goal Name</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Icon</Label>
+              <div className="flex gap-2 flex-wrap">
+                {ICONS.map(icon => (
+                  <button
+                    key={icon}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, icon }))}
+                    className={cn(
+                      'w-9 h-9 rounded-lg text-lg flex items-center justify-center border-2 transition-colors',
+                      form.icon === icon ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'
+                    )}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Target Amount</Label>
+                <Input type="number" step="0.01" min="0" value={form.target_amount} onChange={e => setForm(f => ({ ...f, target_amount: e.target.value }))} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Current Amount</Label>
+                <Input type="number" step="0.01" min="0" value={form.current_amount} onChange={e => setForm(f => ({ ...f, current_amount: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Target Date</Label>
+                <Input type="date" value={form.target_date} onChange={e => setForm(f => ({ ...f, target_date: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Color</Label>
+                <input
+                  type="color"
+                  value={form.color}
+                  onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  className="h-9 w-full rounded-md border border-input cursor-pointer p-1"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button type="submit">{editGoal ? 'Update' : 'Create'} Goal</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editGoal ? 'Edit Goal' : 'New Goal'}>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Goal Name</label>
-            <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
-          </div>
-          <div className="form-group">
-            <label>Icon</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {ICONS.map(icon => (
-                <button key={icon} type="button" onClick={() => setForm(f => ({ ...f, icon }))} style={{
-                  width: 36, height: 36, borderRadius: 8, fontSize: '1.125rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: form.icon === icon ? `2px solid ${form.color}` : '2px solid var(--border-color)', background: form.icon === icon ? form.color + '15' : 'transparent'
-                }}>
-                  {icon}
-                </button>
-              ))}
+      {/* Add funds modal */}
+      <Dialog open={!!addFundsModal} onOpenChange={open => !open && setAddFundsModal(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Funds to {addFundsModal?.name}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddFunds} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Amount to Add</Label>
+              <Input type="number" step="0.01" min="0.01" value={addAmount} onChange={e => setAddAmount(e.target.value)} required autoFocus />
             </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Target Amount</label>
-              <input className="form-control" type="number" step="0.01" min="0" value={form.target_amount} onChange={e => setForm(f => ({ ...f, target_amount: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label>Current Amount</label>
-              <input className="form-control" type="number" step="0.01" min="0" value={form.current_amount} onChange={e => setForm(f => ({ ...f, current_amount: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Target Date</label>
-              <input className="form-control" type="date" value={form.target_date} onChange={e => setForm(f => ({ ...f, target_date: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label>Color</label>
-              <input className="form-control" type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} style={{ height: 42, padding: 4 }} />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">{editGoal ? 'Update' : 'Create'} Goal</button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal isOpen={!!addFundsModal} onClose={() => setAddFundsModal(null)} title={`Add Funds to ${addFundsModal?.name}`}>
-        <form onSubmit={handleAddFunds}>
-          <div className="form-group">
-            <label>Amount to Add</label>
-            <input className="form-control" type="number" step="0.01" min="0.01" value={addAmount} onChange={e => setAddAmount(e.target.value)} required autoFocus />
-          </div>
-          {addFundsModal && (
-            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-              Current: {formatCurrency(addFundsModal.current_amount)} / Target: {formatCurrency(addFundsModal.target_amount)}
-            </div>
-          )}
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => setAddFundsModal(null)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Add Funds</button>
-          </div>
-        </form>
-      </Modal>
+            {addFundsModal && (
+              <p className="text-sm text-muted-foreground">
+                Current: {formatCurrency(addFundsModal.current_amount)} / Target: {formatCurrency(addFundsModal.target_amount)}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="secondary" onClick={() => setAddFundsModal(null)}>Cancel</Button>
+              <Button type="submit">Add Funds</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
