@@ -12,6 +12,7 @@ import NetWorth from './pages/NetWorth';
 import Settings from './pages/Settings';
 import Import from './pages/Import';
 import AISummary from './pages/AISummary';
+import Flagle from './pages/Flagle';
 import Login from './pages/Login';
 import Setup from './pages/Setup';
 
@@ -61,6 +62,7 @@ function AppRoutes() {
                 <Route path="/goals" element={<Goals />} />
                 <Route path="/trends" element={<Trends />} />
                 <Route path="/net-worth" element={<NetWorth />} />
+                <Route path="/flagle" element={<Flagle />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </main>
